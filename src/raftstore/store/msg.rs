@@ -33,6 +33,7 @@ pub struct WriteResponse {
 
 pub type ReadCallback = Box<dyn FnOnce(ReadResponse) + Send>;
 pub type WriteCallback = Box<dyn FnOnce(WriteResponse) + Send>;
+pub type ReadCallbackRef = Box<dyn for<'a> FnOnce(&'a mut ReadResponse) + Send>;
 
 /// Variants of callbacks for `Msg`.
 ///  - `Read`: a callbak for read only requests including `StatusRequest`,
@@ -44,6 +45,7 @@ pub enum Callback {
     None,
     /// Read callback.
     Read(ReadCallback),
+    ReadRef(ReadCallbackRef),
     /// Write callback.
     Write(WriteCallback),
 }
@@ -51,31 +53,39 @@ pub enum Callback {
 impl Callback {
     pub fn invoke_with_response(self, resp: RaftCmdResponse) {
         match self {
-            Callback::None => (),
-            Callback::Read(read) => {
+            Self::None => (),
+            Self::Read(read) => {
                 let resp = ReadResponse {
                     response: resp,
                     snapshot: None,
                 };
                 read(resp);
             }
-            Callback::Write(write) => {
+            Self::ReadRef(read) => {
+                let mut resp = ReadResponse {
+                    response: resp,
+                    snapshot: None,
+                };
+                read(&mut resp);
+            }
+            Self::Write(write) => {
                 let resp = WriteResponse { response: resp };
                 write(resp);
             }
         }
     }
 
-    pub fn invoke_read(self, args: ReadResponse) {
+    pub fn invoke_read(self, mut args: ReadResponse) {
         match self {
-            Callback::Read(read) => read(args),
+            Self::Read(read) => read(args),
+            Self::ReadRef(read) => read(&mut args),
             other => panic!("expect Callback::Read(..), got {:?}", other),
         }
     }
 
     pub fn is_none(&self) -> bool {
         match self {
-            Callback::None => true,
+            Self::None => true,
             _ => false,
         }
     }
@@ -84,9 +94,10 @@ impl Callback {
 impl fmt::Debug for Callback {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            Callback::None => write!(fmt, "Callback::None"),
-            Callback::Read(_) => write!(fmt, "Callback::Read(..)"),
-            Callback::Write(_) => write!(fmt, "Callback::Write(..)"),
+            Self::None => write!(fmt, "Callback::None"),
+            Self::Read(_) => write!(fmt, "Callback::Read(..)"),
+            Self::ReadRef(_) => write!(fmt, "Callback::ReadRef(..)"),
+            Self::Write(_) => write!(fmt, "Callback::Write(..)"),
         }
     }
 }
