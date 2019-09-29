@@ -371,7 +371,7 @@ fn test_read_index_when_transfer_leader_1() {
             sim.async_command_on_node(
                 old_leader.get_id(),
                 read_request,
-                Callback::Read(Box::new(move |resp| tx.send(resp.response).unwrap())),
+                Callback::ReadRef(Box::new(move |resp| tx.send(resp.response.clone()).unwrap())),
             )
             .unwrap();
             rx

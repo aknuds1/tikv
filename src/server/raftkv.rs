@@ -142,14 +142,14 @@ fn on_write_result(mut write_resp: WriteResponse, req_cnt: usize) -> (CbContext,
     (cb_ctx, Ok(CmdRes::Resp(resps.into())))
 }
 
-fn on_read_result(mut read_resp: ReadResponse, req_cnt: usize) -> (CbContext, Result<CmdRes>) {
+fn on_read_result(read_resp: &mut ReadResponse, req_cnt: usize) -> (CbContext, Result<CmdRes>) {
     let cb_ctx = new_ctx(&read_resp.response);
     if let Err(e) = check_raft_cmd_response(&mut read_resp.response, req_cnt) {
         return (cb_ctx, Err(e));
     }
     let resps = read_resp.response.take_responses();
     if !resps.is_empty() || resps[0].get_cmd_type() == CmdType::Snap {
-        (cb_ctx, Ok(CmdRes::Snap(read_resp.snapshot.unwrap())))
+        (cb_ctx, Ok(CmdRes::Snap(read_resp.snapshot.clone().unwrap())))
     } else {
         (cb_ctx, Ok(CmdRes::Resp(resps.into())))
     }
@@ -189,7 +189,7 @@ impl<S: RaftStoreRouter> RaftKv<S> {
         self.router
             .send_command(
                 cmd,
-                StoreCallback::Read(Box::new(move |resp| {
+                StoreCallback::ReadRef(Box::new(move |resp| {
                     let (cb_ctx, res) = on_read_result(resp, len);
                     cb((cb_ctx, res.map_err(Error::into)));
                 })),

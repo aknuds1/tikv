@@ -396,13 +396,13 @@ pub fn make_cb(cmd: &RaftCmdRequest) -> (Callback, mpsc::Receiver<RaftCmdRespons
 
     let (tx, rx) = mpsc::channel();
     let cb = if is_read {
-        Callback::Read(Box::new(move |resp: ReadResponse| {
-            // we don't care error actually.
-            let _ = tx.send(resp.response);
+        Callback::ReadRef(Box::new(move |resp: &mut ReadResponse| {
+            // we don't care about the error.
+            let _ = tx.send(resp.response.clone());
         }))
     } else {
         Callback::Write(Box::new(move |resp: WriteResponse| {
-            // we don't care error actually.
+            // we don't care about the error.
             let _ = tx.send(resp.response);
         }))
     };
